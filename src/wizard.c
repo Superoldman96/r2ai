@@ -149,7 +149,8 @@ static bool wizard_step_personality(RCore *core) {
 	}
 	show_clippy_message (core, "🎭 Want to give r2ai a custom personality?");
 	r_cons_printf (core->cons,
-		"\nr2ai defaults to 'r2clippy'. Later you can %s.\n\n", R2AI_CLAW_HINT);
+		"\nr2ai defaults to 'r2clippy'. Later you can %s.\n\n",
+		R2AI_CLAW_HINT);
 	if (!r_cons_yesno (core->cons, 'n', "Generate a custom personality now? (y/N)")) {
 		return true;
 	}

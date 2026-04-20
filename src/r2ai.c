@@ -5,9 +5,9 @@
 #include "r2ai.h"
 #include "r2ai_priv.h"
 
+// clang-format off
 static RCoreHelpMessage help_msg_r2ai = {
-	"Usage:",
-	"r2ai", " [-args] [...]",
+	"Usage:", "r2ai", " [-args] [...]",
 	"r2ai", " -w", "Launch the interactive setup wizard",
 	"r2ai", " -d", "Decompile current function",
 	"r2ai", " -d [query]", "Ask a question on the current function",
@@ -37,6 +37,7 @@ static RCoreHelpMessage help_msg_r2ai = {
 	"r2ai", " [query]", "query the selected model+provider with the given query",
 	NULL
 };
+// clang-format on
 
 R_API char *r2ai(RCorePluginSession *cps, R2AIArgs args) {
 	RCore *core = cps->core;
@@ -137,8 +138,7 @@ static void cmd_r2ai_d(RCorePluginSession *cps, const char *input, const bool re
 	char *s = r_strbuf_drain (sb);
 	if (r_config_get_b (core->config, "r2ai.async")) {
 		const char *sys = r_config_get (core->config, "r2ai.system");
-		char *title = r_str_newf ("-d%s%s", recursive? "r": "",
-			R_STR_ISNOTEMPTY (input)? " ": "");
+		char *title = r_str_newf ("-d%s%s", recursive? "r": "", R_STR_ISNOTEMPTY (input)? " ": "");
 		if (R_STR_ISNOTEMPTY (input)) {
 			char *n = r_str_newf ("%s%s", title, input);
 			free (title);
@@ -146,7 +146,6 @@ static void cmd_r2ai_d(RCorePluginSession *cps, const char *input, const bool re
 		}
 		int id = r2ai_async_query (cps, title, s, sys);
 		r_cons_printf (core->cons, "[async] task %d queued (%s)\n", id, title);
-		r_cons_flush (core->cons);
 		free (title);
 	} else {
 		char *error = NULL;
@@ -243,8 +242,7 @@ static void cmd_r2ai_R(RCorePluginSession *cps, const char *q) {
 				KDNode *n = r->node;
 				float dist_sq = r->dist_sq;
 				float cos_sim = 1.0f - (dist_sq * 0.5f); // for normalized vectors
-				printf ("%2d) dist_sq=%.4f cos_sim=%.4f text=\"%s\"\n", i + 1, dist_sq,
-					cos_sim, (n->text? n->text: "(null)"));
+				printf ("%2d) dist_sq=%.4f cos_sim=%.4f text=\"%s\"\n", i + 1, dist_sq, cos_sim, (n->text? n->text: "(null)"));
 			}
 			r_vdb_result_free (rs);
 		} else {
@@ -405,7 +403,6 @@ R_API void cmd_r2ai(RCorePluginSession *cps, const char *input) {
 			char *title = r_str_newf ("-a %s", q);
 			int id = r2ai_async_auto (cps, title, q, system_prompt);
 			r_cons_printf (core->cons, "[async] task %d queued (%s)\n", id, title);
-			r_cons_flush (core->cons);
 			free (title);
 			free (system_prompt);
 		} else {
@@ -426,8 +423,7 @@ R_API void cmd_r2ai(RCorePluginSession *cps, const char *input) {
 			r_cons_printf (core->cons, "No conversation history available\n");
 		} else {
 			r2ai_delete_last_messages (messages, N);
-			r_cons_printf (core->cons, "Deleted %d message%s from chat history\n", N > 0? N: 1,
-				(N > 0 && N != 1)? "s": "");
+			r_cons_printf (core->cons, "Deleted %d message%s from chat history\n", N > 0? N: 1, (N > 0 && N != 1)? "s": "");
 		}
 	} else if (r_str_startswith (input, "-C")) {
 		cmd_r2ai_c (cps);
@@ -492,7 +488,6 @@ R_API void cmd_r2ai(RCorePluginSession *cps, const char *input) {
 			const char *sys = r_config_get (core->config, "r2ai.system");
 			int id = r2ai_async_query (cps, input, input, sys);
 			r_cons_printf (core->cons, "[async] task %d queued\n", id);
-			r_cons_flush (core->cons);
 		} else {
 			char *err = NULL;
 			char *res =
@@ -653,19 +648,17 @@ R_IPI bool r2ai_init(RCorePluginSession *cps) {
 	r_config_set (core->config, "r2ai.hlang", "english");
 	r_config_desc (core->config, "r2ai.hlang", "Human language for prompts/messages (e.g. english)");
 	r_config_set (
-		core->config, "r2ai.system",
-		"You are a reverse engineer. The user is reversing a binary, using "
-		"radare2. The user will ask questions about the binary and you will "
-		"respond with the answer to the best of your ability. "
-		"If none of the available tools fit the request, answer directly "
-		"from your own knowledge instead of inventing tool names. Only the "
-		"tools explicitly listed in this conversation exist.");
+		core->config, "r2ai.system", "You are a reverse engineer. The user is reversing a binary, using "
+			"radare2. The user will ask questions about the binary and you will "
+			"respond with the answer to the best of your ability. "
+			"If none of the available tools fit the request, answer directly "
+			"from your own knowledge instead of inventing tool names. Only the "
+			"tools explicitly listed in this conversation exist.");
 	r_config_set (
-		core->config, "r2ai.prompt",
-		"Rewrite this function and respond ONLY with code, replace goto/labels "
-		"with if/else/for, use NO explanations, NO markdown, Simplify as much as "
-		"possible, use better variable names, take function arguments and "
-		"strings from comments like 'string:'");
+		core->config, "r2ai.prompt", "Rewrite this function and respond ONLY with code, replace goto/labels "
+			"with if/else/for, use NO explanations, NO markdown, Simplify as much as "
+			"possible, use better variable names, take function arguments and "
+			"strings from comments like 'string:'");
 	r_config_set (core->config, "r2ai.promptdir", "~/.config/r2ai/prompts");
 	r_config_desc (core->config, "r2ai.promptdir", "Directory containing .r2ai prompt files");
 	r_config_set_b (core->config, "r2ai.clippy", false);

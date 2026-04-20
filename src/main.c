@@ -73,7 +73,7 @@ static void r2ai_repl(RCorePluginSession *cps, const char *provider, const char 
 				.model = model,
 				.error = &err,
 				.dorag = false,
-			};
+};
 			char *res = r2ai (cps, args);
 			if (res) {
 				if (r_config_get_b (core->config, "r2ai.clippy")) {
@@ -241,7 +241,7 @@ int main(int argc, const char **argv) {
 				.model = model,
 				.error = &err,
 				.dorag = false,
-			};
+};
 			char *res = r2ai (&cps, args);
 			if (res) {
 				r_cons_println (core->cons, res);

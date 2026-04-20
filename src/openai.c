@@ -164,11 +164,14 @@ R_IPI R2AI_ChatResponse *r2ai_openai(RCorePluginSession *cps, R2AIArgs args) {
 	char *complete_json;
 	if (openai_tools_json) {
 		complete_json = r_str_newf ("%s, \"messages\": %s, \"tools\": %s}",
-			model_json, messages_json, openai_tools_json);
+			model_json,
+			messages_json,
+			openai_tools_json);
 		free (openai_tools_json);
 	} else {
 		complete_json = r_str_newf ("%s, \"messages\": %s}",
-			model_json, messages_json);
+			model_json,
+			messages_json);
 	}
 
 	// Free intermediate strings

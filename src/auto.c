@@ -56,16 +56,7 @@ static void r2ai_print_run_end(RCorePluginSession *cps, const R2AI_Usage *usage,
 	char *total_time_str = format_time_duration (total_time);
 
 	// Print detailed stats
-	r_cons_printf (core->cons, "\x1b[1" Color_BLUE "%s | total: %d in: %d out: %d | run: %d in: %d out: %d | %s / %s" Color_RESET "\n",
-		r_config_get (core->config, "r2ai.model"),
-		state->stats.total_tokens,
-		state->stats.total_prompt_tokens,
-		state->stats.total_completion_tokens,
-		state->stats.run_tokens,
-		state->stats.run_prompt_tokens,
-		state->stats.run_completion_tokens,
-		run_time_str,
-		total_time_str);
+	r_cons_printf (core->cons, "\x1b[1" Color_BLUE "%s | total: %d in: %d out: %d | run: %d in: %d out: %d | %s / %s" Color_RESET "\n", r_config_get (core->config, "r2ai.model"), state->stats.total_tokens, state->stats.total_prompt_tokens, state->stats.total_completion_tokens, state->stats.run_tokens, state->stats.run_prompt_tokens, state->stats.run_completion_tokens, run_time_str, total_time_str);
 	r_cons_newline (core->cons);
 	r_cons_flush (core->cons);
 
@@ -499,8 +490,7 @@ R_IPI void cmd_r2ai_logs(RCorePluginSession *cps, const char *flags) {
 		return;
 	}
 
-	r_cons_printf (core->cons, "\x1b[1" Color_BLUE "[r2ai] Chat Logs (%d messages)" Color_RESET "\n",
-		r_list_length (messages));
+	r_cons_printf (core->cons, "\x1b[1" Color_BLUE "[r2ai] Chat Logs (%d messages)" Color_RESET "\n", r_list_length (messages));
 
 	r_cons_printf (core->cons, "\x1b[1" Color_YELLOW "Note: System prompt is applied automatically but not stored in history" Color_RESET "\n\n");
 
@@ -522,8 +512,7 @@ R_IPI void cmd_r2ai_logs(RCorePluginSession *cps, const char *flags) {
 				RListIter *iter;
 				R2AI_ToolCall *tc;
 				r_list_foreach (msg->tool_calls, iter, tc) {
-					r_cons_printf (core->cons, "  \x1b[1" Color_MAGENTA "[tool call]:" Color_RESET " %s\n",
-						tc->name? tc->name: "<unnamed>");
+					r_cons_printf (core->cons, "  \x1b[1" Color_MAGENTA "[tool call]:" Color_RESET " %s\n", tc->name? tc->name: "<unnamed>");
 
 					if (tc->arguments) {
 						r_cons_printf (core->cons, "    %s\n", tc->arguments);
@@ -601,7 +590,7 @@ static void process_conversation_with_llm(RCorePluginSession *cps, bool compact)
 		// Fallback to hardcoded prompt
 		prompt_text = strdup (compact
 				? "Create a compact summary of this conversation that preserves all key information, insights, and context for future reference."
-				"Focus on essential details about the binary analysis, tools used, findings, and any important conclusions."
+					"Focus on essential details about the binary analysis, tools used, findings, and any important conclusions."
 				: "mai create a summary of all the information retrieved from the binary that is relevant for future work");
 	}
 

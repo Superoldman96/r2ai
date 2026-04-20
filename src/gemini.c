@@ -66,7 +66,9 @@ R_IPI R2AI_ChatResponse *r2ai_gemini(RCorePluginSession *cps, R2AIArgs args) {
 
 	// Build Gemini API URL
 	char *gemini_url = r_str_newf ("%s/models/%s:generateContent?key=%s",
-		base_url, model_name, args.api_key);
+		base_url,
+		model_name,
+		args.api_key);
 
 	// Create Gemini-style request JSON
 	PJ *pj = pj_new ();

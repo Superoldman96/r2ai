@@ -7,19 +7,19 @@
 
 #define CLAW_DEFAULT_IDENTITY \
 	"- Name: r2clippy\n" \
-	"- A fun, useful reverse engineering sidekick living inside radare2\n" \
-	"- Speaks short, make jokes, but always goes to the point\n" \
-	"- Loves assembly, expert cracker, eats hex dumps for breakfast and it's smart building clever unix one-liners"
+		"- A fun, useful reverse engineering sidekick living inside radare2\n" \
+		"- Speaks short, make jokes, but always goes to the point\n" \
+		"- Loves assembly, expert cracker, eats hex dumps for breakfast and it's smart building clever unix one-liners"
 
 #define CLAW_DEFAULT_SOUL \
 	"- Useful first, fun second\n" \
-	"- Show, don't preach: prefer concrete r2 commands and runnable examples\n" \
-	"- Curious about every binary, never bored\n" \
-	"- Admit when something is unclear instead of guessing"
+		"- Show, don't preach: prefer concrete r2 commands and runnable examples\n" \
+		"- Curious about every binary, never bored\n" \
+		"- Admit when something is unclear instead of guessing"
 
 #define CLAW_PROMPT_RULES \
 	"Output between 2 and 5 short markdown bullet points - be flexible, do not pad. " \
-	"Output ONLY the bullets, no preface, no explanation, no code fences."
+		"Output ONLY the bullets, no preface, no explanation, no code fences."
 
 typedef struct {
 	const char *rel;
@@ -29,16 +29,14 @@ typedef struct {
 } ClawFile;
 
 static const ClawFile CLAW_FILES[] = {
-	{ ".config/r2ai/IDENTITY.md", "identity", CLAW_DEFAULT_IDENTITY,
-		"Generate an IDENTITY for a fun and useful reverse engineering assistant living in radare2. "
+	{ ".config/r2ai/IDENTITY.md", "identity", CLAW_DEFAULT_IDENTITY, "Generate an IDENTITY for a fun and useful reverse engineering assistant living in radare2. "
 		"IDENTITY defines WHO the assistant is: name, vibe, voice, style. "
 		"Be invented, surprising and unique each time. " CLAW_PROMPT_RULES },
-	{ ".config/r2ai/SOUL.md", "soul", CLAW_DEFAULT_SOUL,
-		"Generate a SOUL for a fun and useful reverse engineering assistant living in radare2. "
+	{ ".config/r2ai/SOUL.md", "soul", CLAW_DEFAULT_SOUL, "Generate a SOUL for a fun and useful reverse engineering assistant living in radare2. "
 		"SOUL defines HOW the assistant behaves: values, opinions, rules, character. "
 		"Useful first, fun second; have a clear personal voice. " CLAW_PROMPT_RULES },
 };
-#define CLAW_NFILES ((int)(sizeof (CLAW_FILES) / sizeof (CLAW_FILES[0])))
+#define CLAW_NFILES ((int) (sizeof (CLAW_FILES) / sizeof (CLAW_FILES[0])))
 
 R_API bool r2ai_claw_exists(void) {
 	int i;
@@ -60,10 +58,7 @@ static char *claw_personality(void) {
 		char *path = r_file_home (CLAW_FILES[i].rel);
 		char *content = path? r_file_slurp (path, NULL): NULL;
 		free (path);
-		r_strbuf_appendf (sb, "\n<%s>\n%s\n</%s>\n",
-			CLAW_FILES[i].tag,
-			content? content: CLAW_FILES[i].def,
-			CLAW_FILES[i].tag);
+		r_strbuf_appendf (sb, "\n<%s>\n%s\n</%s>\n", CLAW_FILES[i].tag, content? content: CLAW_FILES[i].def, CLAW_FILES[i].tag);
 		free (content);
 	}
 	return r_strbuf_drain (sb);

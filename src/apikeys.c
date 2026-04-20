@@ -24,10 +24,10 @@ R_API void r2ai_apikeys_edit(RCorePluginSession *cps) {
 	free (config_dir);
 	if (!exists) {
 		const char *template = "# API Keys configuration for r2ai\n"
-				"\n"
-				"# Specify your API keys in the format: PROVIDER=KEY\n"
-				"# OpenAI=sk-your-openai-api-key-here\n"
-				"# MISTRAL=your-mistral-api-key-here\n";
+			"\n"
+			"# Specify your API keys in the format: PROVIDER=KEY\n"
+			"# OpenAI=sk-your-openai-api-key-here\n"
+			"# MISTRAL=your-mistral-api-key-here\n";
 		r_file_dump (keys_path, (const ut8 *)template, strlen (template), 0);
 	}
 	r_cons_editor (core->cons, keys_path, NULL);

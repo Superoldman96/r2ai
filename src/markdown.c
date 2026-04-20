@@ -263,8 +263,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 
 					// Use the actual number from markdown and format it
 					char formatted_number[32];
-					snprintf (formatted_number, sizeof (formatted_number),
-						current_theme.list_number, num_buf);
+					snprintf (formatted_number, sizeof (formatted_number), current_theme.list_number, num_buf);
 					r_strbuf_append (sb, formatted_number);
 
 					p += 2; // Skip ". "
