@@ -740,6 +740,8 @@ R_API bool r2ai_fini(RCorePluginSession *cps) {
 		state->tools = NULL;
 		r_vdb_free (state->db);
 		state->db = NULL;
+		free (state->vertex_token);
+		state->vertex_token = NULL;
 		free (state);
 		cps->data = NULL;
 	}
