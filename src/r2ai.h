@@ -162,6 +162,9 @@ typedef struct {
 	time_t total_start_time;
 } R2AIStats;
 
+// Forward declaration for async task queue (defined in r2ai_priv.h)
+struct r2ai_task_queue_t;
+
 // Main state structure to hold all global state
 typedef struct r2ai_state_t {
 	RList *conversation; // Global conversation messages (from messages.c)
@@ -171,6 +174,7 @@ typedef struct r2ai_state_t {
 	bool theme_initialized; // Global theme flag (from markdown.c)
 	void *help_msg; // Global help message (from r2ai.c)
 	RVdb *db; // Vector database for embeddings
+	struct r2ai_task_queue_t *async; // Async task queue (from async.c)
 } R2AI_State;
 
 /**

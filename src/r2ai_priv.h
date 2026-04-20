@@ -2,6 +2,7 @@
 #define INCLUDE_R2AI_PRIV__H
 
 #include "r2ai.h"
+#include <r_th.h>
 
 typedef enum {
 	R2AI_API_OPENAI_COMPATIBLE,
@@ -9,6 +10,64 @@ typedef enum {
 	R2AI_API_GEMINI,
 	R2AI_API_OLLAMA
 } R2AI_API_Type;
+
+/* Async task subsystem (see ASYNC.md) */
+typedef enum {
+	R2AI_TASK_PENDING = 0,
+	R2AI_TASK_RUNNING,
+	R2AI_TASK_WAIT_APPROVE,
+	R2AI_TASK_WAIT_INPUT,
+	R2AI_TASK_COMPLETE,
+	R2AI_TASK_ERROR,
+	R2AI_TASK_CANCELLED,
+} R2AITaskState;
+
+typedef enum {
+	R2AI_TASK_QUERY = 0,
+	R2AI_TASK_AUTO,
+} R2AITaskKind;
+
+typedef struct r2ai_task_t {
+	int id;
+	R2AITaskKind kind;
+	R2AITaskState state;
+	char *title;
+	char *query;
+	char *system_prompt;
+	char *model;
+	char *provider;
+	RList *messages; /* R2AI_Message * - owned conversation */
+	char *output; /* flushed by -si */
+	char *error;
+	char *pending_tool_name;
+	char *pending_tool_args;
+	char *pending_tool_call_id;
+	char *tool_result; /* main -> worker handoff */
+	bool flushed; /* output already printed */
+	bool cancel_req;
+	RThread *thread;
+	RThreadLock *lock;
+	RThreadSemaphore *gate;
+	RCorePluginSession *cps;
+	time_t created;
+	time_t started;
+	time_t finished;
+	int steps;
+} R2AITask;
+
+typedef struct r2ai_task_queue_t {
+	RList *tasks;
+	RThreadLock *lock;
+	int next_id;
+} R2AITaskQueue;
+
+R_IPI void r2ai_async_init(R2AI_State *state);
+R_IPI void r2ai_async_fini(R2AI_State *state);
+R_IPI int r2ai_async_query(RCorePluginSession *cps,
+	const char *title, const char *query, const char *sysp);
+R_IPI int r2ai_async_auto(RCorePluginSession *cps,
+	const char *title, const char *query, const char *sysp);
+R_IPI void r2ai_async_cmd(RCorePluginSession *cps, const char *input);
 
 typedef struct {
 	const char *name;

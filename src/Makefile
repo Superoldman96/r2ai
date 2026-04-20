@@ -43,6 +43,7 @@ endif
 
 OBJS=r2ai.o
 OBJS+=apikeys.o
+OBJS+=async.o
 OBJS+=claw.o
 OBJS+=llm.o
 OBJS+=auto.o

@@ -27,6 +27,7 @@ static RCoreHelpMessage help_msg_r2ai = {
 	"r2ai", " -q", "list available query prompts",
 	"r2ai", " -q [name] (inst)", "run predefined prompt with optional instructions",
 	"r2ai", " -r", "enter the chat repl",
+	"r2ai", " -s[?ijak*]", "async task queue: list, show, interact, kill (see r2ai -s?)",
 	"r2ai", " -L", "show chat logs (See -Lj for json). Only for auto mode.",
 	"r2ai", " -C", "compact conversation history",
 	"r2ai", " -LR", "create a log report",
@@ -134,17 +135,32 @@ static void cmd_r2ai_d(RCorePluginSession *cps, const char *input, const bool re
 	}
 	r_list_free (refslist);
 	char *s = r_strbuf_drain (sb);
-	char *error = NULL;
-	R2AIArgs d_args = { .input = s, .error = &error, .dorag = true };
-	char *res = r2ai (cps, d_args);
-	free (s);
-	if (error) {
-		R_LOG_ERROR ("%s", error);
-		free (error);
+	if (r_config_get_b (core->config, "r2ai.async")) {
+		const char *sys = r_config_get (core->config, "r2ai.system");
+		char *title = r_str_newf ("-d%s%s", recursive? "r": "",
+			R_STR_ISNOTEMPTY (input)? " ": "");
+		if (R_STR_ISNOTEMPTY (input)) {
+			char *n = r_str_newf ("%s%s", title, input);
+			free (title);
+			title = n;
+		}
+		int id = r2ai_async_query (cps, title, s, sys);
+		r_cons_printf (core->cons, "[async] task %d queued (%s)\n", id, title);
+		r_cons_flush (core->cons);
+		free (title);
 	} else {
-		r_cons_printf (core->cons, "%s\n", res);
+		char *error = NULL;
+		R2AIArgs d_args = { .input = s, .error = &error, .dorag = true };
+		char *res = r2ai (cps, d_args);
+		if (error) {
+			R_LOG_ERROR ("%s", error);
+			free (error);
+		} else {
+			r_cons_printf (core->cons, "%s\n", res);
+		}
+		free (res);
 	}
-	free (res);
+	free (s);
 	r_list_free (cmdslist);
 }
 
@@ -376,7 +392,25 @@ R_API void cmd_r2ai(RCorePluginSession *cps, const char *input) {
 			r_core_cmdf (core, "-e r2ai.%s", arg);
 		}
 	} else if (r_str_startswith (input, "-a")) {
-		cmd_r2ai_a (cps, r_str_trim_head_ro (input + 2));
+		const char *q = r_str_trim_head_ro (input + 2);
+		if (r_config_get_b (core->config, "r2ai.async")) {
+			const char *base_system = r_config_get (core->config, "r2ai.system");
+			extern const char *Gprompt_auto;
+			const char *think_prefix = r_config_get_b (core->config, "r2ai.auto.think")
+				? ""
+				: "/no_think\nReasoning: Low\n";
+			char *system_prompt = R_STR_ISNOTEMPTY (base_system)
+				? r_str_newf ("%s%s\n\n%s", think_prefix, base_system, Gprompt_auto)
+				: r_str_newf ("%s%s", think_prefix, Gprompt_auto);
+			char *title = r_str_newf ("-a %s", q);
+			int id = r2ai_async_auto (cps, title, q, system_prompt);
+			r_cons_printf (core->cons, "[async] task %d queued (%s)\n", id, title);
+			r_cons_flush (core->cons);
+			free (title);
+			free (system_prompt);
+		} else {
+			cmd_r2ai_a (cps, q);
+		}
 	} else if (r_str_startswith (input, "-b")) {
 		const char *baseurl = r_str_trim_head_ro (input + 2);
 		if (R_STR_ISEMPTY (baseurl)) {
@@ -397,6 +431,8 @@ R_API void cmd_r2ai(RCorePluginSession *cps, const char *input) {
 		}
 	} else if (r_str_startswith (input, "-C")) {
 		cmd_r2ai_c (cps);
+	} else if (r_str_startswith (input, "-s")) {
+		r2ai_async_cmd (cps, input + 2);
 	} else if (r_str_startswith (input, "-LR")) {
 		cmd_r2ai_lr (cps);
 	} else if (r_str_startswith (input, "-L")) {
@@ -452,16 +488,23 @@ R_API void cmd_r2ai(RCorePluginSession *cps, const char *input) {
 	} else if (r_str_startswith (input, "-")) {
 		r_core_cmd_help (core, help_msg_r2ai);
 	} else {
-		char *err = NULL;
-		char *res =
-			r2ai (cps, (R2AIArgs){ .input = input, .error = &err, .dorag = true });
-		if (err) {
-			R_LOG_ERROR ("%s", err);
-			R_FREE (err);
-		}
-		if (res) {
-			r_cons_printf (core->cons, "%s\n", res);
-			free (res);
+		if (r_config_get_b (core->config, "r2ai.async")) {
+			const char *sys = r_config_get (core->config, "r2ai.system");
+			int id = r2ai_async_query (cps, input, input, sys);
+			r_cons_printf (core->cons, "[async] task %d queued\n", id);
+			r_cons_flush (core->cons);
+		} else {
+			char *err = NULL;
+			char *res =
+				r2ai (cps, (R2AIArgs){ .input = input, .error = &err, .dorag = true });
+			if (err) {
+				R_LOG_ERROR ("%s", err);
+				R_FREE (err);
+			}
+			if (res) {
+				r_cons_printf (core->cons, "%s\n", res);
+				free (res);
+			}
 		}
 	}
 }
@@ -660,13 +703,19 @@ R_IPI bool r2ai_init(RCorePluginSession *cps) {
 	r_config_desc (core->config, "r2ai.auto.slim", "Use slim mode for auto commands (temporarily disable asm.lines.fcn and scr.utf8)");
 	r_config_set_b (core->config, "r2ai.debug", false);
 	r_config_desc (core->config, "r2ai.debug", "Enable debug output including API request/response details and curl commands");
+	r_config_set_b (core->config, "r2ai.async", false);
+	r_config_desc (core->config, "r2ai.async", "Run LLM calls in background threads (see r2ai -s, -si)");
 	r_config_lock (core->config, true);
+
+	r2ai_async_init (state);
 
 	return load_r2airc (cps);
 }
 
 R_API bool r2ai_fini(RCorePluginSession *cps) {
 	RCore *core = cps->core;
+	R2AI_State *state = cps->data;
+	r2ai_async_fini (state);
 	r_config_lock (core->config, false);
 	r_config_rm (core->config, "r2ai.api");
 	r_config_rm (core->config, "r2ai.cmds");
@@ -685,9 +734,9 @@ R_API bool r2ai_fini(RCorePluginSession *cps) {
 	r_config_rm (core->config, "r2ai.http.use_files");
 	r_config_rm (core->config, "r2ai.auto.slim");
 	r_config_rm (core->config, "r2ai.debug");
+	r_config_rm (core->config, "r2ai.async");
 	r_config_lock (core->config, true);
 
-	R2AI_State *state = cps->data;
 	r2ai_conversation_free (state);
 
 	if (state) {

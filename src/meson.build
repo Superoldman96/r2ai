@@ -63,6 +63,7 @@ common_deps = r2_deps + [cc.find_library('m', required: false)]
 
 srcs = files(
   'anthropic.c',
+  'async.c',
   'auto.c',
   'apikeys.c',
   'claw.c',
