@@ -65,7 +65,7 @@ static bool wizard_mark_ready(void) {
 static void show_clippy_message(RCore *core, const char *message) {
 	r_cons_clear00 (core->cons);
 	char *cmd = r_str_newf ("?E %s", message);
-	r_core_cmd_call (core, cmd);
+	r_core_call (core, cmd);
 	free (cmd);
 	r_cons_flush (core->cons);
 }
@@ -130,7 +130,7 @@ static bool wizard_step_setup(RCore *core) {
 
 	show_clippy_message (core, "🔑 Time to configure those API keys!");
 	r_cons_printf (core->cons, "\nOpening API key configuration...\n");
-	r_core_cmd_call (core, "r2ai -K");
+	r_core_call (core, "r2ai -K");
 
 	return true;
 }
@@ -139,7 +139,7 @@ static void wizard_claw_invoke(RCore *core, const char *extra) {
 	char *cmd = R_STR_ISNOTEMPTY (extra)
 		? r_str_newf ("r2ai -id %s", extra)
 		: strdup ("r2ai -id");
-	r_core_cmd_call (core, cmd);
+	r_core_call (core, cmd);
 	free (cmd);
 }
 
@@ -195,7 +195,7 @@ static bool wizard_step_basic_usage(RCore *core) {
 
 			if (r_str_startswith (line, "shell")) {
 				r_cons_printf (core->cons, "Entering r2ai shell mode (type 'exit' to return)...\n");
-				r_core_cmd_call (core, "r2ai -r");
+				r_core_call (core, "r2ai -r");
 			} else if (r_str_startswith (line, "back")) {
 				break;
 			} else if (r_str_startswith (line, "skip")) {

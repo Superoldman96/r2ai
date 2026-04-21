@@ -201,7 +201,7 @@ static void cmd_r2ai_repl(RCorePluginSession *cps) {
 			r_strbuf_appendf (sb, "Assistant: %s\n", res);
 			if (r_config_get_b (core->config, "r2ai.clippy")) {
 				char *cmd = r_str_newf ("?E %s", res);
-				r_core_cmd_call (core, cmd);
+				r_core_call (core, cmd);
 				free (cmd);
 			} else {
 				r_cons_printf (core->cons, "%s\n", res);

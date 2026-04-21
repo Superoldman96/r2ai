@@ -15,6 +15,10 @@
 #include "r_vdb.h"
 #include "markdown.h"
 
+#if R2_ABIVERSION < 83
+#define r_core_call(x,y) r_core_cmd_call(x,y)
+#endif
+
 #define R2AI_VERSION "1.3.8"
 
 #if 0

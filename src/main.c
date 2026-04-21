@@ -78,7 +78,7 @@ static void r2ai_repl(RCorePluginSession *cps, const char *provider, const char 
 			if (res) {
 				if (r_config_get_b (core->config, "r2ai.clippy")) {
 					char *cmd = r_str_newf (CLIPPY " %s", res);
-					r_core_cmd_call (core, cmd);
+					r_core_call (core, cmd);
 					free (cmd);
 				} else {
 					r_cons_println (core->cons, res);
@@ -189,7 +189,7 @@ int main(int argc, const char **argv) {
 	}
 	if (filename) {
 		char *cmd = r_str_newf ("o %s", filename);
-		r_core_cmd_call (core, cmd);
+		r_core_call (core, cmd);
 		free (cmd);
 		// TODO: use the C api instead of the 'o' command and check for error if file exists etc
 	} else {
@@ -198,7 +198,7 @@ int main(int argc, const char **argv) {
 	}
 	if (scriptfile) {
 		char *cmd = r_str_newf (". %s", scriptfile);
-		r_core_cmd_call (core, cmd);
+		r_core_call (core, cmd);
 		free (cmd);
 	}
 	if (!r_list_empty (commands)) {
