@@ -407,7 +407,8 @@ static void show_task_list(RCorePluginSession *cps, bool json) {
 	R2AITaskQueue *q = state->async;
 	queue_lock (q);
 	if (json) {
-		PJ *pj = pj_new ();
+		PJ *pj = r_core_pj_new (cps->core);
+		pj_ko (pj, "tasks");
 		pj_a (pj);
 		RListIter *it;
 		R2AITask *t;
@@ -434,8 +435,9 @@ static void show_task_list(RCorePluginSession *cps, bool json) {
 			task_unlock (t);
 		}
 		pj_end (pj);
+		pj_end (pj);
 		char *s = pj_drain (pj);
-		r_cons_printf (core->cons, "%s\n", s);
+		r_cons_println (core->cons, s);
 		free (s);
 	} else if (r_list_empty (q->tasks)) {
 		r_cons_printf (core->cons, "No async tasks\n");
