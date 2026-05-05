@@ -39,6 +39,34 @@ static RCoreHelpMessage help_msg_r2ai = {
 };
 // clang-format on
 
+static char *r2ai_default_auto_prompt(void) {
+	return strdup (
+		"You are a reverse engineer and you are using radare2 to analyze a binary.\n"
+		"The user will ask questions about the binary and you will respond with the answer to the best of your ability.\n"
+		"\n"
+		"# Guidelines\n"
+		"- Understand the Task: Grasp the main objective, goals, requirements, constraints, and expected output.\n"
+		"- Reasoning Before Conclusions**: Encourage reasoning steps before any conclusions are reached.\n"
+		"- Assume the user is always asking you about the binary, unless they're specifically asking you for radare2 help.\n"
+		"- The binary has already been loaded. You can interact with the binary using the r2cmd tool.\n"
+		"- `this` or `here` might refer to the current address in the binary or the binary itself.\n"
+		"- If you need more information, try to use the r2cmd tool to run commands before answering.\n"
+		"- You can use the r2cmd tool multiple times if you need or you can pass a command with pipes if you need to chain commands.\n"
+		"- IMPORTANT: You must make only ONE tool call per response. Do not make multiple tool calls in a single response.\n"
+		"- Keep your reasoning concise and avoid repeating the same thoughts. If you have a clear next step, execute it immediately with a tool call.\n"
+		"- If you're asked to decompile a function, make sure to return the code in the language you think it was originally written "
+		"and rewrite it to be as easy as possible to be understood. Make sure you use descriptive variable and function names and add comments.\n"
+		"- Don't just regurgitate the same code, figure out what it's doing and rewrite it to be more understandable.\n"
+		"- If you need to run a command in r2 before answering, you can use the r2cmd tool\n"
+		"- Do not repeat commands if you already know the answer.\n"
+		"- Formulate a plan. Think step by step. Analyze the binary as much as possible before answering.\n"
+		"- You must keep going until you have a final answer.\n"
+		"- Double check that final answer. Make sure you didn't miss anything.\n"
+		"- Make sure you call tools and functions correctly.\n"
+		"- When calling tools, use the exact format: {\"tool_calls\": [{\"id\": \"call_123\", \"type\": \"function\", \"function\": {\"name\": \"r2cmd\", \"arguments\": \"{\\\"command\\\":\\\"aa\\\"}\"}}]}\n"
+		"- Arguments must be a JSON string, not an object.\n");
+}
+
 R_API char *r2ai(RCorePluginSession *cps, R2AIArgs args) {
 	RCore *core = cps->core;
 	if (R_STR_ISEMPTY (args.input) && !args.messages) {
@@ -392,14 +420,7 @@ R_API void cmd_r2ai(RCorePluginSession *cps, const char *input) {
 	} else if (r_str_startswith (input, "-a")) {
 		const char *q = r_str_trim_head_ro (input + 2);
 		if (r_config_get_b (core->config, "r2ai.async")) {
-			const char *base_system = r_config_get (core->config, "r2ai.system");
-			extern const char *Gprompt_auto;
-			const char *think_prefix = r_config_get_b (core->config, "r2ai.auto.think")
-				? ""
-				: "/no_think\nReasoning: Low\n";
-			char *system_prompt = R_STR_ISNOTEMPTY (base_system)
-				? r_str_newf ("%s%s\n\n%s", think_prefix, base_system, Gprompt_auto)
-				: r_str_newf ("%s%s", think_prefix, Gprompt_auto);
+			char *system_prompt = r2ai_auto_system_prompt (cps);
 			char *title = r_str_newf ("-a %s", q);
 			int id = r2ai_async_auto (cps, title, q, system_prompt);
 			r_cons_printf (core->cons, "[async] task %d queued (%s)\n", id, title);
@@ -607,6 +628,7 @@ R_IPI bool r2ai_init(RCorePluginSession *cps) {
 	// Initialize state
 	R2AI_State *state = R_NEW0 (R2AI_State);
 	cps->data = state;
+	state->prompt_auto = r2ai_default_auto_prompt ();
 
 	// Initialize conversation container
 	r2ai_conversation_init (state);
@@ -744,6 +766,8 @@ R_API bool r2ai_fini(RCorePluginSession *cps) {
 		state->tools = NULL;
 		r_vdb_free (state->db);
 		state->db = NULL;
+		free (state->prompt_auto);
+		state->prompt_auto = NULL;
 		free (state->vertex_token);
 		state->vertex_token = NULL;
 		free (state);

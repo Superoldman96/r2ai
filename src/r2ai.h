@@ -179,6 +179,7 @@ typedef struct r2ai_state_t {
 	void *help_msg; // Global help message (from r2ai.c)
 	RVdb *db; // Vector database for embeddings
 	struct r2ai_task_queue_t *async; // Async task queue (from async.c)
+	char *prompt_auto; // Auto-mode system prompt
 	char *vertex_token; // Cached Vertex AI OAuth2 token
 	ut64 vertex_token_expiry; // Monotonic microseconds when the cached token expires
 } R2AI_State;
@@ -359,6 +360,7 @@ R_IPI R2AI_ChatResponse *r2ai_gemini(RCorePluginSession *cps, R2AIArgs args);
 
 // auto mode
 R_IPI void cmd_r2ai_a(RCorePluginSession *cps, const char *user_query);
+R_IPI char *r2ai_auto_system_prompt(RCorePluginSession *cps);
 // R_API char *r2ai(RCore *core, R2AI_State *state, R2AIArgs args);
 R_API char *r2ai(RCorePluginSession *cps, R2AIArgs args);
 R_API bool r2ai_init(RCorePluginSession *cps);

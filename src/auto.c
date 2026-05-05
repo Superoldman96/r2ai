@@ -139,44 +139,22 @@ static void update_tool_call_argument(R2AI_Message *msg, const char *tool_call_i
 	}
 }
 
-#if 0
-static const char *Gprompt_auto =
-	"You are a reverse engineer using radare2.\n"
-	"Answer questions about the loaded binary using r2cmd tool calls.\n"
-	"\n"
-	"Rules:\n"
-	"- Use r2cmd tool to run radare2 commands when you need information\n"
-	"- Make tool calls immediately when you need data\n"
-	"- Provide final answer only after gathering needed information\n"
-	"- Keep responses short and direct\n"
-	;
-#else
-const char *Gprompt_auto =
-	"You are a reverse engineer and you are using radare2 to analyze a binary.\n"
-	"The user will ask questions about the binary and you will respond with the answer to the best of your ability.\n"
-	"\n"
-	"# Guidelines\n"
-	"- Understand the Task: Grasp the main objective, goals, requirements, constraints, and expected output.\n"
-	"- Reasoning Before Conclusions**: Encourage reasoning steps before any conclusions are reached.\n"
-	"- Assume the user is always asking you about the binary, unless they're specifically asking you for radare2 help.\n"
-	"- The binary has already been loaded. You can interact with the binary using the r2cmd tool.\n"
-	"- `this` or `here` might refer to the current address in the binary or the binary itself.\n"
-	"- If you need more information, try to use the r2cmd tool to run commands before answering.\n"
-	"- You can use the r2cmd tool multiple times if you need or you can pass a command with pipes if you need to chain commands.\n"
-	"- IMPORTANT: You must make only ONE tool call per response. Do not make multiple tool calls in a single response.\n"
-	"- Keep your reasoning concise and avoid repeating the same thoughts. If you have a clear next step, execute it immediately with a tool call.\n"
-	"- If you're asked to decompile a function, make sure to return the code in the language you think it was originally written "
-	"and rewrite it to be as easy as possible to be understood. Make sure you use descriptive variable and function names and add comments.\n"
-	"- Don't just regurgitate the same code, figure out what it's doing and rewrite it to be more understandable.\n"
-	"- If you need to run a command in r2 before answering, you can use the r2cmd tool\n"
-	"- Do not repeat commands if you already know the answer.\n"
-	"- Formulate a plan. Think step by step. Analyze the binary as much as possible before answering.\n"
-	"- You must keep going until you have a final answer.\n"
-	"- Double check that final answer. Make sure you didn't miss anything.\n"
-	"- Make sure you call tools and functions correctly.\n"
-	"- When calling tools, use the exact format: {\"tool_calls\": [{\"id\": \"call_123\", \"type\": \"function\", \"function\": {\"name\": \"r2cmd\", \"arguments\": \"{\\\"command\\\":\\\"aa\\\"}\"}}]}\n"
-	"- Arguments must be a JSON string, not an object.\n";
-#endif
+static const char *auto_prompt_get(R2AI_State *state) {
+	return (state && R_STR_ISNOTEMPTY (state->prompt_auto))? state->prompt_auto: "";
+}
+
+R_IPI char *r2ai_auto_system_prompt(RCorePluginSession *cps) {
+	RCore *core = cps->core;
+	R2AI_State *state = cps->data;
+	const char *base_system = r_config_get (core->config, "r2ai.system");
+	const char *prompt_auto = auto_prompt_get (state);
+	const char *think_prefix = r_config_get_b (core->config, "r2ai.auto.think")
+		? ""
+		: "/no_think\nReasoning: Low\n";
+	return R_STR_ISNOTEMPTY (base_system)
+		? r_str_newf ("%s%s\n\n%s", think_prefix, base_system, prompt_auto)
+		: r_str_newf ("%s%s", think_prefix, prompt_auto);
+}
 
 // Helper function to process messages and handle tool calls recursively
 R_API void process_messages(RCorePluginSession *cps, RList *messages, const char *system_prompt, int n_run) {
@@ -192,7 +170,7 @@ R_API void process_messages(RCorePluginSession *cps, RList *messages, const char
 		return;
 	}
 
-	const char *effective_prompt = system_prompt? system_prompt: Gprompt_auto;
+	const char *effective_prompt = system_prompt? system_prompt: auto_prompt_get (state);
 	if (!system_prompt) {
 		const char *init_commands = r_config_get (core->config, "r2ai.auto.init_commands");
 		if (R_STR_ISNOTEMPTY (init_commands)) {
@@ -415,13 +393,7 @@ R_IPI void cmd_r2ai_a(RCorePluginSession *cps, const char *user_query) {
 	};
 	r2ai_msgs_add (messages, &user_msg);
 
-	const char *base_system = r_config_get (core->config, "r2ai.system");
-	const char *think_prefix = r_config_get_b (core->config, "r2ai.auto.think")
-		? ""
-		: "/no_think\nReasoning: Low\n";
-	char *system_prompt = R_STR_ISNOTEMPTY (base_system)
-		? r_str_newf ("%s%s\n\n%s", think_prefix, base_system, Gprompt_auto)
-		: r_str_newf ("%s%s", think_prefix, Gprompt_auto);
+	char *system_prompt = r2ai_auto_system_prompt (cps);
 	process_messages (cps, messages, system_prompt, 1);
 	free (system_prompt);
 }

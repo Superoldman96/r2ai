@@ -6,8 +6,6 @@
 #include "r2ai_priv.h"
 #include <r_th.h>
 
-extern const char *Gprompt_auto;
-
 static const char *state_name(R2AITaskState s) {
 	switch (s) {
 	case R2AI_TASK_PENDING: return "pending";
@@ -33,7 +31,8 @@ static void task_unlock(R2AITask *t) {
 }
 
 static bool task_is_live_locked(const R2AITask *t) {
-	return t->state == R2AI_TASK_PENDING || t->state == R2AI_TASK_RUNNING || t->state == R2AI_TASK_WAIT_APPROVE || t->state == R2AI_TASK_WAIT_INPUT;
+	R2AITaskState s = t->state;
+	return s == R2AI_TASK_PENDING || s == R2AI_TASK_RUNNING || s == R2AI_TASK_WAIT_APPROVE || s == R2AI_TASK_WAIT_INPUT;
 }
 
 /* Append text to task->output. Takes task lock. */
@@ -338,7 +337,11 @@ static R2AITask *task_new(RCorePluginSession *cps, R2AITaskKind kind, const char
 	t->state = R2AI_TASK_PENDING;
 	t->title = strdup (title? title: "");
 	t->query = strdup (query? query: "");
-	t->system_prompt = system_prompt? strdup (system_prompt): NULL;
+	if (R_STR_ISEMPTY (system_prompt) && kind == R2AI_TASK_AUTO) {
+		t->system_prompt = r2ai_auto_system_prompt (cps);
+	} else {
+		t->system_prompt = system_prompt? strdup (system_prompt): NULL;
+	}
 	const char *m = r_config_get (core->config, "r2ai.model");
 	const char *p = r_config_get (core->config, "r2ai.api");
 	t->model = m? strdup (m): NULL;
