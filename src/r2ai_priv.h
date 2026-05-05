@@ -45,7 +45,6 @@ typedef struct r2ai_task_t {
 	char *pending_tool_args;
 	char *pending_tool_call_id;
 	char *tool_result; /* main -> worker handoff */
-	bool flushed; /* output already printed */
 	bool cancel_req;
 	RThread *thread;
 	RThreadLock *lock;

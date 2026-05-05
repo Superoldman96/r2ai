@@ -99,7 +99,10 @@ R_IPI R2AI_ChatResponse *r2ai_vertex_gemini(RCorePluginSession *cps, R2AIArgs ar
 	char *vertex_url = r_str_newf (
 		"https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s"
 		"/publishers/google/models/%s:generateContent",
-		region, project, region, model_name);
+		region,
+		project,
+		region,
+		model_name);
 
 	PJ *pj = pj_new ();
 	pj_o (pj);
@@ -292,7 +295,10 @@ R_IPI R2AI_ChatResponse *r2ai_vertex_anthropic(RCorePluginSession *cps, R2AIArgs
 	char *vertex_url = r_str_newf (
 		"https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s"
 		"/publishers/anthropic/models/%s:rawPredict",
-		region, project, region, model_name);
+		region,
+		project,
+		region,
+		model_name);
 
 	const char *system_message = NULL;
 	if (R_STR_ISNOTEMPTY (args.system_prompt)) {

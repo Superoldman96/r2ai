@@ -404,9 +404,6 @@ static void show_task_list(RCorePluginSession *cps, bool json) {
 		r_cons_printf (core->cons, "async queue not initialised\n");
 		return;
 	}
-	if (r_config_get_b (core->config, "r2ai.async.purge")) {
-		purge_finished (cps);
-	}
 	R2AITaskQueue *q = state->async;
 	queue_lock (q);
 	if (json) {
@@ -425,6 +422,10 @@ static void show_task_list(RCorePluginSession *cps, bool json) {
 			pj_ki (pj, "age", (int) (time (NULL) - t->created));
 			if (t->pending_tool_name) {
 				pj_ks (pj, "pending_tool", t->pending_tool_name);
+			}
+			const char *out = r_strbuf_get (t->output);
+			if (R_STR_ISNOTEMPTY (out)) {
+				pj_ks (pj, "output", out);
 			}
 			if (t->error) {
 				pj_ks (pj, "error", t->error);
@@ -455,9 +456,19 @@ static void show_task_list(RCorePluginSession *cps, bool json) {
 				extra = extrabuf;
 			}
 			r_cons_printf (core->cons, "%-4d %-6s %-13s %-4d  %s%s\n", t->id, kind_name (t->kind), state_name (t->state), age, t->title? t->title: "", extra);
+			const char *out = r_strbuf_get (t->output);
+			if (R_STR_ISNOTEMPTY (out)) {
+				r_cons_printf (core->cons, "output:\n%s", out);
+				if (!r_str_endswith (out, "\n")) {
+					r_cons_newline (core->cons);
+				}
+			}
 			free (extrabuf);
 			task_unlock (t);
 		}
+	}
+	if (r_config_get_b (core->config, "r2ai.async.purge")) {
+		purge_finished (cps);
 	}
 	queue_unlock (q);
 }
@@ -718,14 +729,14 @@ static void show_help(RCorePluginSession *cps) {
 	RCore *core = cps->core;
 	r_cons_printf (core->cons,
 		"Usage: r2ai -s[subcmd]\n"
-		"  -s           list pending async tasks\n"
+		"  -s           list async tasks and completed output\n"
 		"  -s?          show this help\n"
-		"  -sj          list tasks as json\n"
+		"  -sj          list tasks as json, including completed output\n"
 		"  -ss          show details of the last created task\n"
 		"  -si          interactive: handle first actionable task\n"
 		"  -si <id>     interactive: handle only task <id>\n"
 		"  -sa          block until all tasks finish\n"
-		"  -s*          purge finished/errored/cancelled tasks\n"
+		"  -sp          purge finished/errored/cancelled tasks\n"
 		"  -s <id>      show details of task <id>\n"
 		"  -sk          kill all tasks\n"
 		"  -sk <id>     kill task <id>\n");
@@ -742,9 +753,9 @@ static void purge_finished(RCorePluginSession *cps) {
 	R2AITask *t;
 	r_list_foreach_safe (q->tasks, it, tmp, t) {
 		task_lock (t);
-		bool finished = t->state == R2AI_TASK_COMPLETE || t->state == R2AI_TASK_ERROR || t->state == R2AI_TASK_CANCELLED;
+		bool drop = t->state == R2AI_TASK_COMPLETE || t->state == R2AI_TASK_ERROR || t->state == R2AI_TASK_CANCELLED;
 		task_unlock (t);
-		if (finished) {
+		if (drop) {
 			drop_task_locked (q, t);
 		}
 	}
@@ -794,7 +805,7 @@ R_IPI void r2ai_async_cmd(RCorePluginSession *cps, const char *input) {
 		interact_once (cps, id);
 	} else if (*a == 'a') {
 		wait_all (cps);
-	} else if (*a == '*') {
+	} else if (*a == 'p') {
 		purge_finished (cps);
 	} else if (*a == 'k') {
 		const char *arg = r_str_trim_head_ro (a + 1);

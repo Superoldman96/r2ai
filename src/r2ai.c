@@ -699,7 +699,7 @@ R_IPI bool r2ai_init(RCorePluginSession *cps) {
 	r_config_set_b (core->config, "r2ai.async", false);
 	r_config_desc (core->config, "r2ai.async", "Run LLM calls in background threads (see r2ai -s, -si)");
 	r_config_set_b (core->config, "r2ai.async.purge", true);
-	r_config_desc (core->config, "r2ai.async.purge", "Auto-drop completed/errored/cancelled async tasks when listing");
+	r_config_desc (core->config, "r2ai.async.purge", "Reserved; use r2ai -s* to drop completed/errored/cancelled async tasks");
 	r_config_lock (core->config, true);
 
 	r2ai_async_init (state);
