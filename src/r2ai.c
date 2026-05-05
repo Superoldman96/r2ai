@@ -786,7 +786,7 @@ static bool r_cmd_r2ai_client(RCorePluginSession *cps, const char *input) {
 }
 
 // PLUGIN Definition Info
-RCorePlugin r_core_plugin_r2ai_client = {
+RCorePlugin r_core_plugin_r2ai = {
 	.meta = {
 		.name = "r2ai",
 		.desc = "r2ai plugin in plain C",
@@ -802,7 +802,7 @@ RCorePlugin r_core_plugin_r2ai_client = {
 #ifndef R2_PLUGIN_INCORE
 R_API RLibStruct radare_plugin = {
 	.type = R_LIB_TYPE_CORE,
-	.data = &r_core_plugin_r2ai_client,
+	.data = &r_core_plugin_r2ai,
 	.abiversion = R2_ABIVERSION,
 	.pkgname = "r2ai",
 	.version = R2_VERSION
