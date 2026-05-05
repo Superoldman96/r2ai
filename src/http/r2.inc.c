@@ -12,7 +12,7 @@ static HttpResponse socket_http_post_with_interrupt(const HTTPRequest *request) 
 #endif
 	int code = 0;
 	int rlen = 0;
-	char *result = r_socket_http_post (request->url, (const char **)request->headers, request->data, &code, &rlen);
+	char *result = r_socket_http_post (request->url, request->headers, request->data, &code, &rlen);
 #if R2__UNIX__
 	alarm (0);
 #endif
@@ -36,7 +36,7 @@ static HttpResponse socket_http_get_with_interrupt(const HTTPRequest *request) {
 	// Make the request - use r_socket_http_get if available
 	int code = 0;
 	int rlen = 0;
-	char *result = r_socket_http_get (request->url, (const char **)request->headers, &code, &rlen);
+	char *result = r_socket_http_get (request->url, request->headers, &code, &rlen);
 #if R2__UNIX__
 	alarm (0);
 #endif

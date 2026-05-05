@@ -104,6 +104,7 @@ These can be set with `r2ai -e <keyname>=<value>`
 | r2ai.auto.verbose | Only for auto mode `r2ai -a`. Will show the output of the tool which ran locally |
 | r2ai.auto.yolo | Set this to true if you don't want r2ai to ask you for approval before running commands sent by the LLM. This is **dangerous**. Recommendation: **leave this to false** unless you fully trust your LLM not to create havoc! |
 | r2ai.http.use_files | If you get CURL argument too long error, set this to true and arguments will be stored in a file.|
+| r2ai.http.headers | Extra HTTP headers to inject in every provider request. One per line, '\n' separated, e.g. `Authorization: Bearer x\nUser-Agent: r2ai/1.0`. Defaults to `R2AI_HEADERS`. |
 
 
 ## Example

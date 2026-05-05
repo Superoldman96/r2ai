@@ -180,28 +180,68 @@ static HttpRequestFunc select_backend(const char *backend, bool is_post) {
 	return func;
 }
 
+static const char **custom_headers(RCore *core, const char **headers, char **extra) {
+	const char *cfg = r_config_get (core->config, "r2ai.http.headers");
+	if (R_STR_ISEMPTY (cfg)) {
+		return headers;
+	}
+	*extra = strdup (cfg);
+	int i = 0, j = 0;
+	for (; headers && headers[i]; i++) {
+	}
+	const char **merged = R_NEWS0 (const char *, i + strlen (*extra) + 2);
+	for (; j < i; j++) {
+		merged[j] = headers[j];
+	}
+	char *p = *extra, *q = p;
+	for (; *p; p++) {
+		const bool escaped_n = (*p == '\\' && p[1] == 'n');
+		if (*p != '\n' && !escaped_n) {
+			continue;
+		}
+		*p = 0;
+		if (*q) {
+			merged[i++] = q;
+		}
+		q = p + (escaped_n? 2: 1);
+		if (escaped_n) {
+			p++;
+		}
+	}
+	if (*q) {
+		merged[i] = q;
+	}
+	return merged;
+}
+
 // Generic HTTP request function that handles backend selection
-static HttpResponse r2ai_http_request(const char *method, RCore *core, const char *url, const char *headers[], const char *data) {
+static HttpResponse r2ai_http_request(const char *method, RCore *core, const char *url, const char **headers, const char *data) {
 	(void)method;
 	bool is_post = (data != NULL);
+	char *extra = NULL;
+	const char **merged = custom_headers (core, headers, &extra);
 
 	HTTPRequest request = {
 		.config = get_http_config (core),
 		.url = url,
 		.data = data,
-		.headers = headers
+		.headers = merged
 	};
 
 	const char *backend = r_config_get (core->config, "r2ai.http.backend");
 	HttpRequestFunc func = select_backend (backend, is_post);
-	if (func) {
-		return r2ai_http_request_with_retry (func, &request, core);
+	if (!func) {
+		R_LOG_ERROR ("Cannot find a valid http backend");
 	}
-	R_LOG_ERROR ("Cannot find a valid http backend");
-	return (HttpResponse){ .body = NULL, .code = -1, .length = 0 };
+	HttpResponse res = func? r2ai_http_request_with_retry (func, &request, core): (HttpResponse){ .body = NULL, .code = -1, .length = 0 };
+	if (merged != headers) {
+		free (merged);
+	}
+	free (extra);
+	return res;
 }
 
-R_API char *r2ai_http_post(RCore *core, const char *url, const char *headers[], const char *data, int *code, int *rlen) {
+R_API char *r2ai_http_post(RCore *core, const char *url, const char **headers, const char *data, int *code, int *rlen) {
 	HttpResponse response = r2ai_http_request ("POST", core, url, headers, data);
 	if (response.code <= 0) {
 		free (response.body);
@@ -219,7 +259,7 @@ R_API char *r2ai_http_post(RCore *core, const char *url, const char *headers[], 
 	return response.body;
 }
 
-R_API char *r2ai_http_get(RCore *core, const char *url, const char *headers[], int *code, int *rlen) {
+R_API char *r2ai_http_get(RCore *core, const char *url, const char **headers, int *code, int *rlen) {
 	HttpResponse response = r2ai_http_request ("GET", core, url, headers, NULL);
 	if (response.code <= 0) {
 		if (response.body) {

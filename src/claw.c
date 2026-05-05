@@ -75,9 +75,9 @@ R_API char *r2ai_claw_system_prompt(const char *base) {
 }
 
 static char *claw_generate(RCorePluginSession *cps, const char *prompt, const char *extra) {
-	char *full = R_STR_ISNOTEMPTY (extra)
-		? r_str_newf ("%s\n\nAdditional hints from the user: %s", prompt, extra)
-		: strdup (prompt);
+	char *full = R_STR_ISEMPTY (extra)
+		? strdup (prompt)
+		: r_str_newf ("%s\n\nAdditional hints from the user: %s", prompt, extra);
 	char *err = NULL;
 	R2AIArgs args = {
 		.input = full,

@@ -108,6 +108,9 @@ Allow AI to run commands without approval (dangerous, default false).
 .TP
 .B r2ai.http.use_files
 Use files for arguments if CURL argument too long.
+.TP
+.B r2ai.http.headers
+Extra HTTP headers added to every provider request, one per line ('\\n' separated). Defaults to the R2AI_HEADERS environment variable.
 .SH QUERY PROMPTS
 Query prompts are predefined templates for common tasks. Available prompts:
 .TP

@@ -45,7 +45,7 @@ typedef struct {
 	R2AI_HttpConfig config;
 	const char *url;
 	const char *data;
-	const char * const *headers;
+	const char **headers;
 } HTTPRequest;
 
 // HTTP response structure
@@ -325,7 +325,7 @@ R_API char *r2ai_cmdstr(RCore *core, const char *cmd);
  * @param use_files Use files instead of arguments
  * @return Response body as string (must be freed by caller) or NULL on error
  */
-R_API char *r2ai_http_post(RCore *core, const char *url, const char *headers[], const char *data, int *code, int *rlen);
+R_API char *r2ai_http_post(RCore *core, const char *url, const char **headers, const char *data, int *code, int *rlen);
 
 /**
  * Send an HTTP GET request
@@ -336,7 +336,7 @@ R_API char *r2ai_http_post(RCore *core, const char *url, const char *headers[], 
  * @param rlen Pointer to store the response length
  * @return Response body as string (must be freed by caller) or NULL on error
  */
-R_API char *r2ai_http_get(RCore *core, const char *url, const char *headers[], int *code, int *rlen);
+R_API char *r2ai_http_get(RCore *core, const char *url, const char **headers, int *code, int *rlen);
 
 /**
  * Get the base URL for a given provider
