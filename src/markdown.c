@@ -16,10 +16,6 @@ typedef enum {
 	STRIKE
 } MarkdownState;
 
-// Global theme instance
-static RMarkdownTheme current_theme;
-static bool theme_initialized = false;
-
 // Set default theme values
 R_API RMarkdownTheme r2ai_markdown_theme_default(void) {
 	RMarkdownTheme theme = {
@@ -48,52 +44,59 @@ R_API RMarkdownTheme r2ai_markdown_theme_default(void) {
 	return theme;
 }
 
-// Initialize theme if not already done
-static void ensure_theme_initialized(void) {
-	if (!theme_initialized) {
-		current_theme = r2ai_markdown_theme_default ();
-		theme_initialized = true;
+R_API void r2ai_markdown_init(RMarkdown *md) {
+	if (!md) {
+		return;
+	}
+	if (!md->initialized) {
+		md->theme = r2ai_markdown_theme_default ();
+		md->initialized = true;
 	}
 }
 
 // Set a custom theme
-R_API void r2ai_markdown_set_theme(const RMarkdownTheme *theme) {
-	if (!theme) {
-		current_theme = r2ai_markdown_theme_default ();
-	} else {
-		current_theme = *theme;
+R_API void r2ai_markdown_set_theme(RMarkdown *md, const RMarkdownTheme *theme) {
+	if (!md) {
+		return;
 	}
-	theme_initialized = true;
+	if (!theme) {
+		md->theme = r2ai_markdown_theme_default ();
+	} else {
+		md->theme = *theme;
+	}
+	md->initialized = true;
 }
 
 // Get the current theme
-R_API const RMarkdownTheme *r2ai_markdown_get_theme(void) {
-	ensure_theme_initialized ();
-	return &current_theme;
+R_API const RMarkdownTheme *r2ai_markdown_get_theme(RMarkdown *md) {
+	if (!md) {
+		return NULL;
+	}
+	r2ai_markdown_init (md);
+	return &md->theme;
 }
 
-static void append_formatted(RStrBuf *sb, const char *text, int len, MarkdownState state) {
-	ensure_theme_initialized ();
+static void append_formatted(RStrBuf *sb, const RMarkdownTheme *theme, const char *text, int len, MarkdownState state) {
 	switch (state) {
 	case BOLD:
-		r_strbuf_append (sb, current_theme.bold);
+		r_strbuf_append (sb, theme->bold);
 		r_strbuf_append_n (sb, text, len);
-		r_strbuf_append (sb, current_theme.reset);
+		r_strbuf_append (sb, theme->reset);
 		break;
 	case ITALIC:
-		r_strbuf_append (sb, current_theme.italic);
+		r_strbuf_append (sb, theme->italic);
 		r_strbuf_append_n (sb, text, len);
-		r_strbuf_append (sb, current_theme.reset);
+		r_strbuf_append (sb, theme->reset);
 		break;
 	case CODE:
-		r_strbuf_append (sb, current_theme.code_inline);
+		r_strbuf_append (sb, theme->code_inline);
 		r_strbuf_append_n (sb, text, len);
-		r_strbuf_append (sb, current_theme.reset);
+		r_strbuf_append (sb, theme->reset);
 		break;
 	case STRIKE:
-		r_strbuf_append (sb, current_theme.strike);
+		r_strbuf_append (sb, theme->strike);
 		r_strbuf_append_n (sb, text, len);
-		r_strbuf_append (sb, current_theme.reset);
+		r_strbuf_append (sb, theme->reset);
 		break;
 	default:
 		r_strbuf_append_n (sb, text, len);
@@ -111,12 +114,17 @@ static int count_indent(const char *str) {
 	return count;
 }
 
-R_API char *r2ai_markdown(const char *markdown) {
+R_API char *r2ai_markdown(RMarkdown *md, const char *markdown) {
 	if (!markdown) {
 		return NULL;
 	}
 
-	ensure_theme_initialized ();
+	RMarkdown fallback = { 0 };
+	if (!md) {
+		md = &fallback;
+	}
+	r2ai_markdown_init (md);
+	const RMarkdownTheme *theme = &md->theme;
 	RStrBuf *sb = r_strbuf_new ("");
 	if (!sb) {
 		return NULL;
@@ -136,7 +144,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 			in_code_block = !in_code_block;
 			if (in_code_block) {
 				// Add padding for full-width code blocks
-				r_strbuf_appendf (sb, "%s\033[K", current_theme.code_block);
+				r_strbuf_appendf (sb, "%s\033[K", theme->code_block);
 
 				// Skip language specifier if present
 				while (*p && *p != '\n') {
@@ -144,7 +152,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 				}
 
 			} else {
-				r_strbuf_appendf (sb, "%s\n", current_theme.reset);
+				r_strbuf_appendf (sb, "%s\n", theme->reset);
 			}
 			start = p;
 			continue;
@@ -154,7 +162,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 			if (*p == '\n') {
 				r_strbuf_append_n (sb, start, p - start);
 				// Add the \033[K (EL - Erase in Line) sequence to extend the background to the end of line
-				r_strbuf_appendf (sb, "\n%s\033[K", current_theme.code_block);
+				r_strbuf_appendf (sb, "\n%s\033[K", theme->code_block);
 				start = p + 1;
 				line_start = 1;
 			}
@@ -183,30 +191,30 @@ R_API char *r2ai_markdown(const char *markdown) {
 				// Add heading with appropriate size
 				switch (level) {
 				case 1:
-					r_strbuf_append (sb, current_theme.heading1);
+					r_strbuf_append (sb, theme->heading1);
 					break;
 				case 2:
-					r_strbuf_append (sb, current_theme.heading2);
+					r_strbuf_append (sb, theme->heading2);
 					break;
 				case 3:
-					r_strbuf_append (sb, current_theme.heading3);
+					r_strbuf_append (sb, theme->heading3);
 					break;
 				case 4:
-					r_strbuf_append (sb, current_theme.heading4);
+					r_strbuf_append (sb, theme->heading4);
 					break;
 				case 5:
-					r_strbuf_append (sb, current_theme.heading5);
+					r_strbuf_append (sb, theme->heading5);
 					break;
 				case 6:
-					r_strbuf_append (sb, current_theme.heading6);
+					r_strbuf_append (sb, theme->heading6);
 					break;
 				default:
-					r_strbuf_append (sb, current_theme.heading1);
+					r_strbuf_append (sb, theme->heading1);
 					break;
 				}
 
 				r_strbuf_append_n (sb, start, heading_end - start);
-				r_strbuf_appendf (sb, "%s\n", current_theme.reset);
+				r_strbuf_appendf (sb, "%s\n", theme->reset);
 
 				if (*heading_end) {
 					p = heading_end + 1;
@@ -230,7 +238,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 
 			// Skip the indent spaces
 			if (indent_level > 0) {
-				append_formatted (sb, start, p - start, state);
+				append_formatted (sb, theme, start, p - start, state);
 				for (int i = 0; i < indent_level; i++) {
 					r_strbuf_append (sb, " ");
 				}
@@ -240,8 +248,8 @@ R_API char *r2ai_markdown(const char *markdown) {
 
 			// Handle bullet lists
 			if (*p == '-' && p[1] == ' ') {
-				append_formatted (sb, start, p - start, state);
-				r_strbuf_append (sb, current_theme.list_bullet);
+				append_formatted (sb, theme, start, p - start, state);
+				r_strbuf_append (sb, theme->list_bullet);
 				p += 2;
 				start = p;
 				line_start = 0;
@@ -256,14 +264,14 @@ R_API char *r2ai_markdown(const char *markdown) {
 				}
 
 				if (*p == '.' && p[1] == ' ') {
-					append_formatted (sb, start, digit_start - start, state);
+					append_formatted (sb, theme, start, digit_start - start, state);
 					int num_len = p - digit_start;
 					char num_buf[16] = { 0 };
 					r_str_ncpy (num_buf, digit_start, num_len < 15? num_len + 1: 15);
 
 					// Use the actual number from markdown and format it
 					char formatted_number[32];
-					snprintf (formatted_number, sizeof (formatted_number), current_theme.list_number, num_buf);
+					snprintf (formatted_number, sizeof (formatted_number), theme->list_number, num_buf);
 					r_strbuf_append (sb, formatted_number);
 
 					p += 2; // Skip ". "
@@ -277,12 +285,12 @@ R_API char *r2ai_markdown(const char *markdown) {
 
 			// Handle checklists
 			if ((*p == '[' && (p[1] == ' ' || p[1] == 'x') && p[2] == ']' && p[3] == ' ')) {
-				append_formatted (sb, start, p - start, state);
+				append_formatted (sb, theme, start, p - start, state);
 
 				if (p[1] == 'x') {
-					r_strbuf_append (sb, current_theme.checkbox_checked);
+					r_strbuf_append (sb, theme->checkbox_checked);
 				} else {
-					r_strbuf_append (sb, current_theme.checkbox_unchecked);
+					r_strbuf_append (sb, theme->checkbox_unchecked);
 				}
 
 				p += 4; // Skip "[ ] " or "[x] "
@@ -301,7 +309,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 			if (p > markdown && !isalnum (*(p - 1)) && isalnum (p[1 + double_marker])) {
 				// Opening marker
 				if (p > start) {
-					append_formatted (sb, start, p - start, state);
+					append_formatted (sb, theme, start, p - start, state);
 				}
 				p += double_marker? 2: 1;
 				start = p;
@@ -317,7 +325,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 				}
 			} else if (p > markdown && isalnum (*(p - 1)) && !isalnum (p[1 + double_marker])) {
 				// Closing marker
-				append_formatted (sb, start, p - start, state);
+				append_formatted (sb, theme, start, p - start, state);
 				p += double_marker? 2: 1;
 				start = p;
 				state = NORMAL;
@@ -325,7 +333,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 				p++;
 			}
 		} else if (*p == '\n') {
-			append_formatted (sb, start, p - start, state);
+			append_formatted (sb, theme, start, p - start, state);
 			r_strbuf_append (sb, "\n");
 			p++;
 			start = p;
@@ -339,7 +347,7 @@ R_API char *r2ai_markdown(const char *markdown) {
 
 	// Handle any remaining text
 	if (p > start) {
-		append_formatted (sb, start, p - start, state);
+		append_formatted (sb, theme, start, p - start, state);
 	}
 
 	char *result = r_strbuf_drain (sb);

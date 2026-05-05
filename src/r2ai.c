@@ -629,6 +629,7 @@ R_IPI bool r2ai_init(RCorePluginSession *cps) {
 	R2AI_State *state = R_NEW0 (R2AI_State);
 	cps->data = state;
 	state->prompt_auto = r2ai_default_auto_prompt ();
+	r2ai_markdown_init (&state->markdown);
 
 	// Initialize conversation container
 	r2ai_conversation_init (state);

@@ -270,34 +270,42 @@ static char *compose_command_with_comment(const char *command, const char *comme
 	return r_str_newf ("%s # %s", command, comment);
 }
 
-R_API char *r2ai_r2cmd(RCore *core, RJson *args, bool verbose, char **edited_command, char **comment_out) {
+R_API void r2ai_tool_result_fini(R2AI_ToolResult *result) {
+	if (!result) {
+		return;
+	}
+	free (result->output);
+	free (result->edited_command);
+	free (result->comment);
+	memset (result, 0, sizeof (*result));
+}
+
+static R2AI_ToolResult r2ai_r2cmd(RCore *core, RJson *args, bool verbose) {
+	R2AI_ToolResult result = { 0 };
 	if (!args) {
-		return strdup ("{ \"res\":\"Command is NULL\" }");
+		result.output = strdup ("{ \"res\":\"Command is NULL\" }");
+		return result;
 	}
 
 	const RJson *command_json = r_json_get (args, "command");
 	if (!command_json || !command_json->str_value) {
-		return strdup ("{ \"res\":\"No command in tool call arguments\" }");
-	}
-
-	if (edited_command) {
-		*edited_command = NULL;
+		result.output = strdup ("{ \"res\":\"No command in tool call arguments\" }");
+		return result;
 	}
 
 	char *comment = NULL;
 	char *command = strip_command_comment (command_json->str_value, &comment);
 	if (!command) {
 		free (comment);
-		return strdup ("{ \"res\":\"Command is NULL\" }");
+		result.output = strdup ("{ \"res\":\"Command is NULL\" }");
+		return result;
 	}
 
 	if (r_str_startswith (command, "r2 ")) {
 		free (command);
 		free (comment);
-		if (comment_out) {
-			*comment_out = NULL;
-		}
-		return strdup ("{ \"res\":\"You are already in r2!\" }");
+		result.output = strdup ("{ \"res\":\"You are already in r2!\" }");
+		return result;
 	}
 
 	bool ask_to_execute = r_config_get_b (core->config, "r2ai.auto.yolo") != true;
@@ -306,7 +314,8 @@ R_API char *r2ai_r2cmd(RCore *core, RJson *args, bool verbose, char **edited_com
 		if (!input_command) {
 			free (command);
 			free (comment);
-			return strdup ("{ \"res\":\"Failed to prepare command\" }");
+			result.output = strdup ("{ \"res\":\"Failed to prepare command\" }");
+			return result;
 		}
 		bool is_multiline = strchr (input_command, '\n') != NULL;
 
@@ -323,10 +332,8 @@ R_API char *r2ai_r2cmd(RCore *core, RJson *args, bool verbose, char **edited_com
 				free (input_command);
 				free (command);
 				free (comment);
-				if (comment_out) {
-					*comment_out = NULL;
-				}
-				return strdup ("R2AI_SIGINT");
+				result.output = strdup ("R2AI_SIGINT");
+				return result;
 			}
 			if (R_STR_ISNOTEMPTY (readline_result)) {
 				free (input_command);
@@ -347,9 +354,7 @@ R_API char *r2ai_r2cmd(RCore *core, RJson *args, bool verbose, char **edited_com
 		free (input_command);
 	}
 
-	if (edited_command) {
-		*edited_command = strdup (command);
-	}
+	result.edited_command = strdup (command);
 	R_LOG_DEBUG ("Edited command: %s", command);
 
 	if (verbose) {
@@ -367,10 +372,9 @@ R_API char *r2ai_r2cmd(RCore *core, RJson *args, bool verbose, char **edited_com
 	if (!json_cmd) {
 		free (command);
 		free (comment);
-		if (comment_out) {
-			*comment_out = NULL;
-		}
-		return strdup ("{ \"res\":\"Failed to create JSON command\" }");
+		r2ai_tool_result_fini (&result);
+		result.output = strdup ("{ \"res\":\"Failed to create JSON command\" }");
+		return result;
 	}
 
 	char *cmd_output = r2ai_cmdstr (core, json_cmd);
@@ -379,19 +383,14 @@ R_API char *r2ai_r2cmd(RCore *core, RJson *args, bool verbose, char **edited_com
 
 	if (!cmd_output) {
 		free (comment);
-		if (comment_out) {
-			*comment_out = NULL;
-		}
-		return strdup ("{ \"res\":\"Command returned no output or failed\" }");
+		r2ai_tool_result_fini (&result);
+		result.output = strdup ("{ \"res\":\"Command returned no output or failed\" }");
+		return result;
 	}
 
-	if (comment_out) {
-		*comment_out = comment;
-	} else {
-		free (comment);
-	}
-
-	return cmd_output;
+	result.output = cmd_output;
+	result.comment = comment;
+	return result;
 }
 
 /**
@@ -420,22 +419,22 @@ R_API char *r2ai_cmdstr(RCore *core, const char *cmd) {
 }
 
 // qjs function implementation
-R_API char *r2ai_qjs(RCore *core, RJson *args, bool verbose, char **edited_script_out) {
+static R2AI_ToolResult r2ai_qjs(RCore *core, R2AI_State *state, RJson *args, bool verbose) {
+	R2AI_ToolResult result = { 0 };
 	if (!args) {
-		return strdup ("{ \"res\":\"Script is NULL\" }");
-	}
-
-	if (edited_script_out) {
-		*edited_script_out = NULL;
+		result.output = strdup ("{ \"res\":\"Script is NULL\" }");
+		return result;
 	}
 
 	const RJson *script_json = r_json_get (args, "script");
 	if (!script_json) {
-		return strdup ("{ \"res\":\"No script field found in arguments\" }");
+		result.output = strdup ("{ \"res\":\"No script field found in arguments\" }");
+		return result;
 	}
 
 	if (!script_json->str_value) {
-		return strdup ("{ \"res\":\"Script value is NULL or empty\" }");
+		result.output = strdup ("{ \"res\":\"Script value is NULL or empty\" }");
+		return result;
 	}
 
 	bool ask_to_execute = r_config_get_b (core->config, "r2ai.auto.yolo") != true;
@@ -462,7 +461,8 @@ R_API char *r2ai_qjs(RCore *core, RJson *args, bool verbose, char **edited_scrip
 			// Check if interrupted or ESC pressed (readline_result is NULL or empty)
 			if (r_cons_is_breaked (core->cons) || R_STR_ISEMPTY (readline_result)) {
 				free (edited_script); // Free if already allocated
-				return strdup ("R2AI_SIGINT");
+				result.output = strdup ("R2AI_SIGINT");
+				return result;
 			}
 
 			// Process the result
@@ -477,16 +477,11 @@ R_API char *r2ai_qjs(RCore *core, RJson *args, bool verbose, char **edited_scrip
 		}
 	}
 
-	if (edited_script_out) {
-		char *dup_script = strdup (script);
-		if (dup_script) {
-			*edited_script_out = dup_script;
-		}
-	}
+	result.edited_command = strdup (script);
 
 	if (verbose) {
 		char *print_script = r_str_newf ("\n```js\n%s\n```", script);
-		char *print_script_rendered = r2ai_markdown (print_script);
+		char *print_script_rendered = r2ai_markdown (state? &state->markdown: NULL, print_script);
 		r_cons_printf (core->cons, "%s\n", print_script_rendered);
 		r_cons_flush (core->cons);
 		free (print_script);
@@ -498,7 +493,9 @@ R_API char *r2ai_qjs(RCore *core, RJson *args, bool verbose, char **edited_scrip
 	free (edited_script);
 
 	if (!payload) {
-		return strdup ("{ \"res\":\"Failed to create script payload\" }");
+		r2ai_tool_result_fini (&result);
+		result.output = strdup ("{ \"res\":\"Failed to create script payload\" }");
+		return result;
 	}
 
 	R_LOG_DEBUG ("Payload length: %d", (int)strlen (payload));
@@ -506,7 +503,9 @@ R_API char *r2ai_qjs(RCore *core, RJson *args, bool verbose, char **edited_scrip
 	char *payload_base64 = r_base64_encode_dyn ((const ut8 *)payload, strlen (payload));
 	if (!payload_base64) {
 		free (payload);
-		return strdup ("{ \"res\":\"Failed to encode script\" }");
+		r2ai_tool_result_fini (&result);
+		result.output = strdup ("{ \"res\":\"Failed to encode script\" }");
+		return result;
 	}
 
 	char *cmd = r_str_newf ("#!qjs -e base64:%s", payload_base64);
@@ -517,183 +516,121 @@ R_API char *r2ai_qjs(RCore *core, RJson *args, bool verbose, char **edited_scrip
 	char *json_cmd = to_cmd (cmd);
 	if (!json_cmd) {
 		free (cmd);
-		return strdup ("{ \"res\":\"Failed to execute qjs\" }");
+		r2ai_tool_result_fini (&result);
+		result.output = strdup ("{ \"res\":\"Failed to execute qjs\" }");
+		return result;
 	}
 
 	char *cmd_output = r_core_cmd_str (core, json_cmd);
 	free (json_cmd);
 	free (cmd);
 
-	return cmd_output;
+	result.output = cmd_output;
+	return result;
 }
 
-R_API char *execute_tool(RCore *core, const char *tool_name, const char *args, char **edited_command, char **comment_out) {
+static void normalize_tool_output(RCore *core, bool verbose, const char *args, R2AI_ToolResult *result) {
+	if (R_STR_ISEMPTY (result->output)) {
+		free (result->output);
+		result->output = strdup ("{ \"res\":\"Error: Empty or invalid response from QJS execution\" }");
+		return;
+	}
+	if (!strcmp (result->output, "R2AI_SIGINT")) {
+		return;
+	}
+	if (!r_str_startswith (result->output, "{") || !strchr (result->output, '}')) {
+		return;
+	}
+
+	RJson *json = r_json_parse (result->output);
+	if (!json) {
+		R_LOG_WARN ("Failed to parse JSON response from tool execution");
+		return;
+	}
+
+	char *normalized = NULL;
+	const RJson *error_json = r_json_get (json, "error");
+	if (error_json && (error_json->type == R_JSON_BOOLEAN || error_json->type == R_JSON_STRING) &&
+		((error_json->type == R_JSON_BOOLEAN && error_json->num.u_value) ||
+			(error_json->type == R_JSON_STRING && error_json->str_value[0]))) {
+		const RJson *logs_json = r_json_get (json, "logs");
+		if (logs_json && logs_json->type == R_JSON_ARRAY) {
+			RStrBuf *sb = r_strbuf_new ("");
+			for (size_t i = 0; i < logs_json->children.count; i++) {
+				const RJson *log = r_json_item (logs_json, i);
+				if (log && log->type == R_JSON_OBJECT) {
+					const RJson *message = r_json_get (log, "message");
+					if (message && message->type == R_JSON_STRING) {
+						r_strbuf_appendf (sb, "%s\n", message->str_value);
+					}
+				}
+			}
+			normalized = r_strbuf_drain (sb);
+		} else if (error_json->type == R_JSON_STRING) {
+			normalized = strdup (error_json->str_value);
+		} else {
+			normalized = strdup ("Error occurred (no details available)");
+		}
+	} else {
+		const RJson *res_json = r_json_get (json, "res");
+		normalized = (res_json && res_json->type == R_JSON_STRING)
+			? strdup (res_json->str_value)
+			: strdup (result->output);
+	}
+	r_json_free (json);
+
+	if (!normalized) {
+		normalized = r_str_newf ("Error running tool: Unknown error\nCommand: %s", args);
+	}
+	free (result->output);
+	result->output = normalized;
+
+	if (verbose) {
+		r_cons_newline (core->cons);
+		r_cons_printf (core->cons, "%s\n", result->output);
+		r_cons_newline (core->cons);
+		r_cons_flush (core->cons);
+	}
+	r_str_ansi_strip (result->output);
+}
+
+R_API R2AI_ToolResult execute_tool(RCorePluginSession *cps, const char *tool_name, const char *args) {
+	R2AI_ToolResult result = { 0 };
+	if (!cps || !cps->core) {
+		result.output = strdup ("{ \"res\":\"Missing r2ai session\" }");
+		return result;
+	}
+	RCore *core = cps->core;
+	R2AI_State *state = cps->data;
 	if (!tool_name || !args) {
-		return strdup ("{ \"res\":\"Tool name or arguments are NULL\" }");
+		result.output = strdup ("{ \"res\":\"Tool name or arguments are NULL\" }");
+		return result;
 	}
 
 	R_LOG_DEBUG ("Args: %s", args);
 
 	// Check if args is valid JSON before parsing
 	if (!r_str_startswith (args, "{") || !strchr (args, '}')) {
-		return r_str_newf ("Invalid JSON arguments: %s", args);
+		result.output = r_str_newf ("Invalid JSON arguments: %s", args);
+		return result;
 	}
 
 	RJson *args_json = r_json_parse ((char *)args);
 	if (!args_json) {
-		return r_str_newf ("Failed to parse arguments: %s", args);
+		result.output = r_str_newf ("Failed to parse arguments: %s", args);
+		return result;
 	}
 
 	bool verbose = r_config_get_b (core->config, "r2ai.auto.verbose");
-	char *tool_result = NULL;
 
 	if (strcmp (tool_name, "r2cmd") == 0) {
-		tool_result = r2ai_r2cmd (core, args_json, verbose, edited_command, comment_out);
+		result = r2ai_r2cmd (core, args_json, verbose);
+	} else if (strcmp (tool_name, "execute_js") == 0) {
+		result = r2ai_qjs (core, state, args_json, verbose);
 	} else {
-		if (comment_out) {
-			*comment_out = NULL;
-		}
-		if (strcmp (tool_name, "execute_js") == 0) {
-			tool_result = r2ai_qjs (core, args_json, verbose, edited_command);
-		} else {
-			tool_result = strdup ("{ \"res\":\"Unknown tool\" }");
-		}
+		result.output = strdup ("{ \"res\":\"Unknown tool\" }");
 	}
-
-	// Check for interruption after executing the tool
-	if (tool_result && strcmp (tool_result, "R2AI_SIGINT") == 0) {
-		free (tool_result);
-		return strdup ("R2AI_SIGINT");
-	}
-
-	// Try to parse as JSON (equivalent to json.loads in Python)
-	char *result = NULL;
-
-	// Check for empty or invalid response that could cause a crash
-	if (R_STR_ISEMPTY (tool_result)) {
-		free (tool_result);
-		return strdup ("{ \"res\":\"Error: Empty or invalid response from QJS execution\" }");
-	}
-
-	// Validate that the tool_result looks like valid JSON before parsing
-	if (!r_str_startswith (tool_result, "{") || !strchr (tool_result, '}')) {
-		// Not a JSON object, return as plain text
-		return tool_result;
-	}
-
-	// Try to parse the JSON safely
-	RJson *json = r_json_parse (tool_result);
-
-	if (!json) {
-		// JSON parsing failed, return original content
-		R_LOG_WARN ("Failed to parse JSON response from tool execution");
-		return tool_result;
-	}
-
-	if (json) {
-		// Check for error field
-		const RJson *error_json = r_json_get (json, "error");
-		if (error_json && (error_json->type == R_JSON_BOOLEAN || error_json->type == R_JSON_STRING) &&
-			((error_json->type == R_JSON_BOOLEAN && error_json->num.u_value) ||
-				(error_json->type == R_JSON_STRING && error_json->str_value[0]))) {
-
-			// Build error message from logs if available
-			const RJson *logs_json = r_json_get (json, "logs");
-			if (logs_json && logs_json->type == R_JSON_ARRAY) {
-				RStrBuf *sb = r_strbuf_new ("");
-
-				for (size_t i = 0; i < logs_json->children.count; i++) {
-					const RJson *log = r_json_item (logs_json, i);
-					if (log && log->type == R_JSON_OBJECT) {
-						const RJson *message = r_json_get (log, "message");
-						if (message && message->type == R_JSON_STRING) {
-							r_strbuf_appendf (sb, "%s\n", message->str_value);
-						}
-					}
-				}
-
-				result = r_strbuf_drain (sb);
-			} else {
-				// If no logs, return the error message directly
-				if (error_json->type == R_JSON_STRING) {
-					result = strdup (error_json->str_value);
-				} else {
-					result = strdup ("Error occurred (no details available)");
-				}
-			}
-		} else {
-			// Extract res field
-			const RJson *res_json = r_json_get (json, "res");
-			if (res_json && res_json->type == R_JSON_STRING) {
-				result = strdup (res_json->str_value);
-			} else {
-				// Just return the entire command output if res field not found
-				result = strdup (tool_result);
-			}
-		}
-
-		r_json_free (json);
-	} else {
-		// JSON parse failed, handle like JSONDecodeError in Python
-		char *trimmed = r_str_trim_dup (tool_result);
-		if (trimmed) {
-			// Manual line splitting to avoid r_str_split issues
-			RList *lines = r_str_split_list (trimmed, "\n", 0);
-			if (lines) {
-				int line_count = r_list_length (lines);
-				if (line_count > 0) {
-					char *last_line = r_list_get_n (lines, line_count - 1);
-					if (last_line && r_str_startswith (last_line, "{\"res\":\"\"")) {
-						// Remove the last line by joining all lines except the last
-						RStrBuf *sb = r_strbuf_new ("");
-						int i = 0;
-
-						// Use manual iteration instead of r_list_foreach_n
-						RListIter *iter;
-						char *line;
-						r_list_foreach (lines, iter, line) {
-							// Skip the last line
-							if (line != last_line) {
-								if (i > 0) {
-									r_strbuf_append (sb, "\n");
-								}
-								r_strbuf_append (sb, line);
-								i++;
-							}
-						}
-
-						result = r_strbuf_drain (sb);
-					} else {
-						// Keep the output as is
-						result = strdup (tool_result);
-					}
-				} else {
-					result = strdup (tool_result);
-				}
-				r_list_free (lines);
-			} else {
-				result = strdup (tool_result);
-			}
-			free (trimmed);
-		} else {
-			result = strdup (tool_result);
-		}
-	}
-
-	free (tool_result);
-
-	if (!result) {
-		return r_str_newf ("Error running tool: Unknown error\nCommand: %s", args);
-	}
-	if (verbose) {
-		r_cons_newline (core->cons);
-		r_cons_printf (core->cons, "%s\n", result);
-		r_cons_newline (core->cons);
-		r_cons_flush (core->cons);
-	}
-
-	r_str_ansi_strip (result);
-
 	r_json_free (args_json);
+	normalize_tool_output (core, verbose, args, &result);
 	return result;
 }

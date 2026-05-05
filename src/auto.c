@@ -174,14 +174,14 @@ R_API void process_messages(RCorePluginSession *cps, RList *messages, const char
 	if (!system_prompt) {
 		const char *init_commands = r_config_get (core->config, "r2ai.auto.init_commands");
 		if (R_STR_ISNOTEMPTY (init_commands)) {
-			char *edited_command = NULL;
-			char *comment = NULL;
-			char *cmd_output = execute_tool (core, "r2cmd", r_str_newf ("{\"command\":\"%s\"}", init_commands), &edited_command, &comment);
-			if (R_STR_ISNOTEMPTY (cmd_output)) {
+			char *tool_args = r_str_newf ("{\"command\":\"%s\"}", init_commands);
+			R2AI_ToolResult tool_result = execute_tool (cps, "r2cmd", tool_args);
+			free (tool_args);
+			if (R_STR_ISNOTEMPTY (tool_result.output)) {
 				char *display_command = strip_command_comment (init_commands, NULL);
-				char *content = r_str_newf ("Here is some information about the binary to get you started:\n>%s\n%s", display_command, cmd_output);
-				if (comment && *comment) {
-					char *new_content = r_str_newf ("%s\nHINT: %s", content, comment);
+				char *content = r_str_newf ("Here is some information about the binary to get you started:\n>%s\n%s", display_command, tool_result.output);
+				if (tool_result.comment && *tool_result.comment) {
+					char *new_content = r_str_newf ("%s\nHINT: %s", content, tool_result.comment);
 					free (content);
 					content = new_content;
 				}
@@ -191,10 +191,8 @@ R_API void process_messages(RCorePluginSession *cps, RList *messages, const char
 				};
 				r2ai_msgs_add (messages, &init_msg);
 				free (display_command);
-				free (cmd_output);
 			}
-			free (edited_command);
-			free (comment);
+			r2ai_tool_result_fini (&tool_result);
 		}
 	}
 
@@ -298,27 +296,33 @@ R_API void process_messages(RCorePluginSession *cps, RList *messages, const char
 			if (interrupted) {
 				cmd_output = strdup ("<user interrupted>");
 			} else {
-				char *edited_command = NULL;
-				cmd_output = execute_tool (core, tool_name, tool_args, &edited_command, &comment);
-				if (edited_command) {
+				R2AI_ToolResult tool_result = execute_tool (cps, tool_name, tool_args);
+				cmd_output = tool_result.output;
+				tool_result.output = NULL;
+				comment = tool_result.comment;
+				tool_result.comment = NULL;
+				if (tool_result.edited_command) {
 					// Update the last message's tool call arguments with the edited command
 					R2AI_Message *last_msg = r_list_get_n (messages, r_list_length (messages) - 1);
 					if (last_msg) {
 						if (!strcmp (tool_name, "r2cmd")) {
-							update_tool_call_argument (last_msg, tool_call->id, "command", edited_command);
+							update_tool_call_argument (last_msg, tool_call->id, "command", tool_result.edited_command);
 						} else if (!strcmp (tool_name, "execute_js")) {
-							update_tool_call_argument (last_msg, tool_call->id, "script", edited_command);
+							update_tool_call_argument (last_msg, tool_call->id, "script", tool_result.edited_command);
 						}
 					}
 				}
-				free (edited_command);
-			}
+				r2ai_tool_result_fini (&tool_result);
+				}
 
-			free (tool_name);
-			free (tool_args);
-			if (strcmp (cmd_output, "R2AI_SIGINT") == 0) {
-				r_cons_printf (core->cons, "\n\n\x1b[1" Color_RED "[r2ai] Processing interrupted after tool execution" Color_RESET "\n\n");
-				r_cons_flush (core->cons);
+				free (tool_name);
+				free (tool_args);
+				if (!cmd_output) {
+					cmd_output = strdup ("<no output>");
+				}
+				if (strcmp (cmd_output, "R2AI_SIGINT") == 0) {
+					r_cons_printf (core->cons, "\n\n\x1b[1" Color_RED "[r2ai] Processing interrupted after tool execution" Color_RESET "\n\n");
+					r_cons_flush (core->cons);
 				free (cmd_output);
 				cmd_output = strdup ("<user interrupted>");
 				interrupted = true;

@@ -584,11 +584,10 @@ static void interact_once(RCorePluginSession *cps, int id) {
 		bool approve = yolo? true: r_cons_yesno (core->cons, 'y', "Run this tool? (Y/n)");
 		char *tool_output = NULL;
 		if (approve) {
-			char *edited = NULL;
-			char *comment = NULL;
-			tool_output = execute_tool (core, tool_name, tool_args, &edited, &comment);
-			free (edited);
-			free (comment);
+			R2AI_ToolResult tool_result = execute_tool (cps, tool_name, tool_args);
+			tool_output = tool_result.output;
+			tool_result.output = NULL;
+			r2ai_tool_result_fini (&tool_result);
 			if (!tool_output) {
 				tool_output = strdup ("<no output>");
 			}

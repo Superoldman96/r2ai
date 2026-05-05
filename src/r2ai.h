@@ -68,6 +68,12 @@ typedef struct {
 	char *parameters; // JSON string of parameters/input_schema
 } R2AI_Tool;
 
+typedef struct {
+	char *output;
+	char *edited_command;
+	char *comment;
+} R2AI_ToolResult;
+
 // Tools array management (now just RList<R2AI_Tool *>)
 
 typedef struct {
@@ -174,8 +180,7 @@ typedef struct r2ai_state_t {
 	RList *conversation; // Global conversation messages (from messages.c)
 	R2AIStats stats; // Global stats (from auto.c)
 	RList *tools; // Global tools instance (from tools.c)
-	RMarkdownTheme current_theme; // Global theme (from markdown.c)
-	bool theme_initialized; // Global theme flag (from markdown.c)
+	RMarkdown markdown; // Markdown rendering context
 	void *help_msg; // Global help message (from r2ai.c)
 	RVdb *db; // Vector database for embeddings
 	struct r2ai_task_queue_t *async; // Async task queue (from async.c)
@@ -299,14 +304,12 @@ R_API char *r2ai_tools_to_anthropic_json(const RList *tools);
  */
 R_API void r2ai_tools_free(RList *tools);
 
+R_API void r2ai_tool_result_fini(R2AI_ToolResult *result);
+
 /**
- * Execute a tool and return the output 
- * The command to execute is within args. The user may interactively
- * modify this command, hence edited_command contains the real
- * command which was run
- * Caller must free edited_command
+ * Execute a tool and return the output plus any edited command/comment metadata.
  */
-R_API char *execute_tool(RCore *core, const char *tool_name, const char *args, char **edited_command, char **comment_out);
+R_API R2AI_ToolResult execute_tool(RCorePluginSession *cps, const char *tool_name, const char *args);
 
 /**
  * Execute r_core_cmd_str with slim mode if enabled
