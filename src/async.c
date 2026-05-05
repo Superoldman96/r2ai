@@ -725,21 +725,33 @@ static void show_last_task(RCorePluginSession *cps) {
 	show_task_by_id (cps, id);
 }
 
+// clang-format off
+static RCoreHelpMessage help_msg_r2ai_s = {
+	"Usage:", "r2ai", " -s[subcmd]",
+	"r2ai", " -s", "list async tasks and completed output",
+	"r2ai", " -s?", "show this help",
+	"r2ai", " -sj", "list tasks as json, including completed output",
+	"r2ai", " -ss", "show details of the last created task",
+	"r2ai", " -si", "interactive: handle first actionable task",
+	"r2ai", " -si <id>", "interactive: handle only task <id>",
+	"r2ai", " -sa", "block until all tasks finish",
+	"r2ai", " -sp", "purge finished/errored/cancelled tasks",
+	"r2ai", " -s <id>", "show details of task <id>",
+	"r2ai", " -sk", "kill all tasks",
+	"r2ai", " -sk <id>", "kill task <id>",
+	NULL
+};
+
+static RCoreHelpMessage help_msg_r2ai_s_kill = {
+	"r2ai", " -sk", "kill all tasks",
+	"r2ai", " -sk <id>", "kill task <id>",
+	NULL
+};
+// clang-format on
+
 static void show_help(RCorePluginSession *cps) {
 	RCore *core = cps->core;
-	r_cons_printf (core->cons,
-		"Usage: r2ai -s[subcmd]\n"
-		"  -s           list async tasks and completed output\n"
-		"  -s?          show this help\n"
-		"  -sj          list tasks as json, including completed output\n"
-		"  -ss          show details of the last created task\n"
-		"  -si          interactive: handle first actionable task\n"
-		"  -si <id>     interactive: handle only task <id>\n"
-		"  -sa          block until all tasks finish\n"
-		"  -sp          purge finished/errored/cancelled tasks\n"
-		"  -s <id>      show details of task <id>\n"
-		"  -sk          kill all tasks\n"
-		"  -sk <id>     kill task <id>\n");
+	r_core_cmd_help (core, help_msg_r2ai_s);
 }
 
 static void purge_finished(RCorePluginSession *cps) {
@@ -791,43 +803,52 @@ static void wait_all(RCorePluginSession *cps) {
 }
 
 R_IPI void r2ai_async_cmd(RCorePluginSession *cps, const char *input) {
-	/* input is the suffix after "-s". */
+	RCore *core = cps->core;
 	const char *a = input? input: "";
-	if (*a == '?') {
+	const char *arg = r_str_trim_head_ro (a + 1);
+	int id = R_STR_ISEMPTY (arg)? 0: r_num_math (core->num, arg);
+	switch (*a) {
+	case '?':
 		show_help (cps);
-	} else if (*a == 'j') {
+		break;
+	case 'j':
 		show_task_list (cps, true);
-	} else if (*a == 's') {
+		break;
+	case 's':
 		show_last_task (cps);
-	} else if (*a == 'i') {
-		const char *arg = r_str_trim_head_ro (a + 1);
-		int id = R_STR_ISEMPTY (arg)? 0: atoi (arg);
+		break;
+	case 'i':
 		interact_once (cps, id);
-	} else if (*a == 'a') {
+		break;
+	case 'a':
 		wait_all (cps);
-	} else if (*a == 'p') {
+		break;
+	case 'p':
 		purge_finished (cps);
-	} else if (*a == 'k') {
-		const char *arg = r_str_trim_head_ro (a + 1);
+		break;
+	case 'k':
 		if (R_STR_ISEMPTY (arg)) {
 			kill_all (cps);
 		} else {
-			int id = atoi (arg);
 			if (id > 0) {
 				kill_by_id (cps, id);
 			} else {
-				show_help (cps);
+				r_core_cmd_help (core, help_msg_r2ai_s_kill);
 			}
 		}
-	} else if (*a == ' ') {
-		const char *arg = r_str_trim_head_ro (a);
-		int id = atoi (arg);
+		break;
+	case ' ':
 		if (id > 0) {
 			show_task_by_id (cps, id);
 		} else {
 			show_task_list (cps, false);
 		}
-	} else {
+		break;
+	case 0:
 		show_task_list (cps, false);
+		break;
+	default:
+		r_core_return_invalid_command (core, "-s", *a);
+		break;
 	}
 }
